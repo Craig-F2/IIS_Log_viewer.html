@@ -1,0 +1,435 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+#drop-zone{border:1.5px dashed var(--color-border-secondary);border-radius:var(--border-radius-lg);padding:2rem;text-align:center;cursor:pointer;transition:background .15s;margin-bottom:1rem}
+#drop-zone:hover,#drop-zone.drag-over{background:var(--color-background-secondary)}
+.file-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:.75rem}
+.file-chip{display:flex;align-items:center;gap:6px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:3px 10px;font-size:12px;color:var(--color-text-secondary)}
+.file-chip button{border:none;background:none;cursor:pointer;font-size:14px;color:var(--color-text-tertiary);padding:0;line-height:1}
+.file-chip button:hover{color:var(--color-text-primary)}
+.stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:1rem}
+.stat-card{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.75rem 1rem}
+.stat-label{font-size:11px;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.stat-val{font-size:20px;font-weight:500;color:var(--color-text-primary)}
+.filters-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:.75rem;align-items:flex-end}
+.filter-group{display:flex;flex-direction:column;gap:4px}
+.filter-group label{font-size:11px;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.04em}
+.filter-group input,.filter-group select{height:32px;font-size:13px;padding:0 8px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);min-width:110px}
+#search-box{min-width:190px}
+.btn{height:32px;padding:0 14px;font-size:13px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);cursor:pointer}
+.btn:hover{background:var(--color-background-secondary)}
+.section-label{font-size:11px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem}
+.chart-wrap{border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:1rem;margin-bottom:1rem}
+.tbl-wrap{overflow-x:auto;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:var(--color-background-secondary);padding:7px 10px;text-align:left;font-weight:500;font-size:11px;color:var(--color-text-secondary);white-space:nowrap;position:sticky;top:0;cursor:pointer;user-select:none;border-bottom:0.5px solid var(--color-border-tertiary)}
+thead th:hover{color:var(--color-text-primary)}
+tbody tr{border-bottom:0.5px solid var(--color-border-tertiary)}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--color-background-secondary)}
+tbody td{padding:5px 10px;white-space:nowrap;color:var(--color-text-primary)}
+.pill{display:inline-block;padding:1px 7px;border-radius:99px;font-size:11px;font-weight:500}
+.pill-2{background:#E1F5EE;color:#085041}.pill-3{background:#FAEEDA;color:#633806}.pill-4{background:#FAECE7;color:#712B13}.pill-5{background:#FCEBEB;color:#791F1F}
+.pagination{display:flex;align-items:center;gap:8px;margin-top:.75rem;font-size:13px;color:var(--color-text-secondary)}
+.pagination button{width:28px;height:28px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:transparent;cursor:pointer;font-size:13px;color:var(--color-text-primary)}
+.pagination button:disabled{opacity:.35;cursor:default}
+.pagination button:hover:not(:disabled){background:var(--color-background-secondary)}
+#empty-msg{text-align:center;padding:2rem;color:var(--color-text-tertiary);font-size:13px}
+.sort-arr{opacity:.35;margin-left:3px;font-size:10px}
+.sort-arr.on{opacity:1}
+.granularity-row{display:flex;gap:6px;margin-bottom:.75rem;align-items:center}
+.gran-btn{height:26px;padding:0 12px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:transparent;color:var(--color-text-secondary);cursor:pointer}
+.gran-btn.active{background:var(--color-background-secondary);color:var(--color-text-primary);border-color:var(--color-border-primary)}
+.gran-btn:hover{background:var(--color-background-secondary)}
+.chart-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--color-text-secondary);margin-bottom:.5rem}
+.legend-item{display:flex;align-items:center;gap:5px}
+.legend-sq{width:10px;height:10px;border-radius:2px}
+</style>
+
+<h2 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">IIS log viewer — multi-file, timeline chart, and filterable table</h2>
+
+<div id="drop-zone" onclick="document.getElementById('fi').click()">
+  <input type="file" id="fi" accept=".log,.txt" multiple style="display:none">
+  <div style="font-size:26px;color:var(--color-text-tertiary);margin-bottom:.4rem">&#8659;</div>
+  <div style="font-weight:500;color:var(--color-text-primary);margin-bottom:.2rem">Drop IIS log files here</div>
+  <div style="font-size:13px;color:var(--color-text-tertiary)">Multiple files supported — W3C extended format · click to browse</div>
+</div>
+
+<div id="file-chips" class="file-chips"></div>
+
+<div id="main" style="display:none">
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-label">Total requests</div><div class="stat-val" id="st-total">0</div></div>
+    <div class="stat-card"><div class="stat-label">Filtered rows</div><div class="stat-val" id="st-filtered">0</div></div>
+    <div class="stat-card"><div class="stat-label">Unique IPs</div><div class="stat-val" id="st-ips">0</div></div>
+    <div class="stat-card"><div class="stat-label">Errors (4xx/5xx)</div><div class="stat-val" id="st-errors">0</div></div>
+  </div>
+
+  <div class="chart-wrap">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;flex-wrap:wrap;gap:8px">
+      <div class="section-label" style="margin:0">Request timeline</div>
+      <div class="granularity-row" style="margin:0">
+        <span style="font-size:11px;color:var(--color-text-tertiary);margin-right:4px">Group by</span>
+        <button class="gran-btn" onclick="setGran('hour')">Hour</button>
+        <button class="gran-btn active" onclick="setGran('day')">Day</button>
+        <button class="gran-btn" onclick="setGran('week')">Week</button>
+      </div>
+    </div>
+    <div class="chart-legend">
+      <span class="legend-item"><span class="legend-sq" style="background:#378ADD"></span>All requests</span>
+      <span class="legend-item"><span class="legend-sq" style="background:#E24B4A"></span>4xx/5xx errors</span>
+    </div>
+    <div style="position:relative;width:100%;height:220px">
+      <canvas id="timeline-chart" role="img" aria-label="Request timeline bar chart showing total requests and errors over time">Request counts over time.</canvas>
+    </div>
+  </div>
+
+  <div class="filters-row">
+    <div class="filter-group">
+      <label>Search all fields</label>
+      <input type="text" id="search-box" placeholder="IP, URL, user agent...">
+    </div>
+    <div class="filter-group">
+      <label>Status code</label>
+      <select id="f-status"><option value="">All</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Method</label>
+      <select id="f-method"><option value="">All</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Source file</label>
+      <select id="f-file"><option value="">All files</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Date from</label>
+      <input type="date" id="f-date-from">
+    </div>
+    <div class="filter-group">
+      <label>Date to</label>
+      <input type="date" id="f-date-to">
+    </div>
+    <div style="margin-top:auto;display:flex;gap:8px">
+      <button class="btn" onclick="clearFilters()">Clear</button>
+      <button class="btn" onclick="exportCSV()">Export CSV</button>
+    </div>
+  </div>
+
+  <div class="tbl-wrap">
+    <table id="log-table">
+      <thead id="thead-row"></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div id="empty-msg" style="display:none">No rows match the current filters.</div>
+  </div>
+
+  <div class="pagination">
+    <button id="btn-prev" onclick="changePage(-1)">&#8249;</button>
+    <span id="pg-info"></span>
+    <button id="btn-next" onclick="changePage(1)">&#8250;</button>
+    <span style="margin-left:auto;font-size:12px">
+      <select id="pg-size" style="height:26px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);padding:0 6px">
+        <option>50</option><option selected>100</option><option>250</option><option>500</option>
+      </select> rows/page
+    </span>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+let allRows=[],fields=[],filtered=[],sortCol=-1,sortDir=1,page=0,gran='day',tlChart=null;
+let loadedFiles={};
+
+const dz=document.getElementById('drop-zone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over');handleFiles(e.dataTransfer.files)});
+document.getElementById('fi').addEventListener('change',e=>handleFiles(e.target.files));
+
+function handleFiles(files){
+  let pending=files.length;
+  Array.from(files).forEach(f=>{
+    if(loadedFiles[f.name]){pending--;if(!pending)rebuild();return}
+    const r=new FileReader();
+    r.onload=e=>{
+      loadedFiles[f.name]=parseLog(e.target.result,f.name);
+      pending--;
+      if(!pending)rebuild();
+    };
+    r.readAsText(f);
+  });
+}
+
+function parseLog(text,fname){
+  const lines=text.split(/\r?\n/);
+  let flds=[],rows=[];
+  for(const ln of lines){
+    if(ln.startsWith('#Fields:')){flds=ln.slice(9).trim().split(' ');continue}
+    if(ln.startsWith('#')||!ln.trim())continue;
+    const parts=ln.split(' ');
+    if(!flds.length||parts.length<flds.length)continue;
+    const row={};
+    flds.forEach((f,i)=>row[f]=parts[i]||'');
+    row['__file']=fname;
+    rows.push(row);
+  }
+  return{fields:flds,rows};
+}
+
+function rebuild(){
+  const mergedFields=[];
+  const seen=new Set();
+  Object.values(loadedFiles).forEach(({fields:flds})=>{
+    flds.forEach(f=>{if(!seen.has(f)){seen.add(f);mergedFields.push(f)}});
+  });
+  fields=mergedFields;
+  allRows=[];
+  Object.values(loadedFiles).forEach(({rows})=>allRows.push(...rows));
+  allRows.sort((a,b)=>{
+    const ad=(a['date']||'')+(a['time']||'');
+    const bd=(b['date']||'')+(b['time']||'');
+    return ad.localeCompare(bd);
+  });
+  updateFileChips();
+  buildUI();
+}
+
+function removeFile(name){
+  delete loadedFiles[name];
+  if(!Object.keys(loadedFiles).length){
+    allRows=[];fields=[];filtered=[];
+    document.getElementById('file-chips').innerHTML='';
+    document.getElementById('main').style.display='none';
+    document.getElementById('drop-zone').style.display='block';
+    return;
+  }
+  rebuild();
+}
+
+function updateFileChips(){
+  const c=document.getElementById('file-chips');
+  c.innerHTML='';
+  Object.keys(loadedFiles).forEach(name=>{
+    const chip=document.createElement('div');
+    chip.className='file-chip';
+    chip.innerHTML=`<span>${name} <span style="color:var(--color-text-tertiary)">(${loadedFiles[name].rows.length.toLocaleString()} rows)</span></span><button onclick="removeFile('${name.replace(/'/g,"\\'")}')">&#215;</button>`;
+    c.appendChild(chip);
+  });
+}
+
+function buildUI(){
+  document.getElementById('drop-zone').style.display='none';
+  document.getElementById('main').style.display='block';
+  buildHeaders();
+  populateFilters();
+  applyFilters();
+}
+
+function buildHeaders(){
+  const tr=document.createElement('tr');
+  const displayFields=[...fields,'__file'];
+  displayFields.forEach((f,i)=>{
+    const th=document.createElement('th');
+    const label=f==='__file'?'source file':f;
+    th.innerHTML=label+'<span class="sort-arr" id="sa-'+i+'">&#9650;</span>';
+    th.onclick=()=>sortBy(i);
+    tr.appendChild(th);
+  });
+  document.getElementById('thead-row').innerHTML='';
+  document.getElementById('thead-row').appendChild(tr);
+}
+
+function populateFilters(){
+  const stSet=new Set(),mtSet=new Set(),fileSet=new Set();
+  const scIdx=fields.indexOf('sc-status'),mIdx=fields.indexOf('cs-method');
+  allRows.forEach(r=>{
+    if(scIdx>=0&&r[fields[scIdx]])stSet.add(r[fields[scIdx]]);
+    if(mIdx>=0&&r[fields[mIdx]])mtSet.add(r[fields[mIdx]]);
+    if(r['__file'])fileSet.add(r['__file']);
+  });
+  const ss=document.getElementById('f-status');
+  ss.innerHTML='<option value="">All</option>';
+  [...stSet].sort().forEach(v=>{const o=document.createElement('option');o.value=v;o.text=v;ss.appendChild(o)});
+  const sm=document.getElementById('f-method');
+  sm.innerHTML='<option value="">All</option>';
+  [...mtSet].sort().forEach(v=>{const o=document.createElement('option');o.value=v;o.text=v;sm.appendChild(o)});
+  const sf=document.getElementById('f-file');
+  sf.innerHTML='<option value="">All files</option>';
+  [...fileSet].sort().forEach(v=>{const o=document.createElement('option');o.value=v;o.text=v;sf.appendChild(o)});
+
+  const dateIdx=fields.indexOf('date');
+  if(dateIdx>=0){
+    const dates=allRows.map(r=>r[fields[dateIdx]]).filter(Boolean).sort();
+    if(dates.length){document.getElementById('f-date-from').value=dates[0];document.getElementById('f-date-to').value=dates[dates.length-1]}
+  }
+  ['search-box','f-status','f-method','f-file','f-date-from','f-date-to'].forEach(id=>{
+    const el=document.getElementById(id);
+    el.oninput=()=>{page=0;applyFilters()};
+  });
+  document.getElementById('pg-size').onchange=()=>{page=0;renderTable()};
+}
+
+function applyFilters(){
+  const q=document.getElementById('search-box').value.toLowerCase().trim();
+  const st=document.getElementById('f-status').value;
+  const mt=document.getElementById('f-method').value;
+  const ff=document.getElementById('f-file').value;
+  const df=document.getElementById('f-date-from').value;
+  const dt=document.getElementById('f-date-to').value;
+  const scIdx=fields.indexOf('sc-status'),mIdx=fields.indexOf('cs-method'),dIdx=fields.indexOf('date');
+  filtered=allRows.filter(r=>{
+    if(q){const all=Object.values(r).join(' ').toLowerCase();if(!all.includes(q))return false}
+    if(st&&r[fields[scIdx]]!==st)return false;
+    if(mt&&r[fields[mIdx]]!==mt)return false;
+    if(ff&&r['__file']!==ff)return false;
+    const d=dIdx>=0?r[fields[dIdx]]:'';
+    if(df&&d&&d<df)return false;
+    if(dt&&d&&d>dt)return false;
+    return true;
+  });
+  updateStats();
+  renderTimeline();
+  renderTable();
+}
+
+function updateStats(){
+  const scIdx=fields.indexOf('sc-status'),ipIdx=fields.indexOf('c-ip');
+  let errors=0;const ips=new Set();
+  filtered.forEach(r=>{
+    const s=scIdx>=0?r[fields[scIdx]]:'';
+    if(s&&(s.startsWith('4')||s.startsWith('5')))errors++;
+    if(ipIdx>=0&&r[fields[ipIdx]])ips.add(r[fields[ipIdx]]);
+  });
+  document.getElementById('st-total').textContent=allRows.length.toLocaleString();
+  document.getElementById('st-filtered').textContent=filtered.length.toLocaleString();
+  document.getElementById('st-ips').textContent=ips.size.toLocaleString();
+  document.getElementById('st-errors').textContent=errors.toLocaleString();
+}
+
+function setGran(g){
+  gran=g;
+  document.querySelectorAll('.gran-btn').forEach(b=>b.classList.toggle('active',b.textContent.toLowerCase()===g));
+  renderTimeline();
+}
+
+function bucketKey(dateStr,timeStr,g){
+  if(!dateStr||dateStr==='-')return null;
+  if(g==='hour')return dateStr+'T'+(timeStr||'00').slice(0,2);
+  if(g==='day')return dateStr;
+  if(g==='week'){
+    const d=new Date(dateStr);if(isNaN(d))return null;
+    const day=d.getDay(),diff=d.getDate()-day+(day===0?-6:1);
+    const mon=new Date(d.setDate(diff));
+    return mon.toISOString().slice(0,10);
+  }
+  return dateStr;
+}
+
+function renderTimeline(){
+  const dIdx=fields.indexOf('date'),tIdx=fields.indexOf('time'),scIdx=fields.indexOf('sc-status');
+  const totals={},errors={};
+  filtered.forEach(r=>{
+    const k=bucketKey(r[fields[dIdx]]||'',r[fields[tIdx]]||'',gran);
+    if(!k)return;
+    totals[k]=(totals[k]||0)+1;
+    const s=scIdx>=0?r[fields[scIdx]]:'';
+    if(s&&(s.startsWith('4')||s.startsWith('5')))errors[k]=(errors[k]||0)+1;
+  });
+  const labels=Object.keys(totals).sort();
+  const tData=labels.map(k=>totals[k]||0);
+  const eData=labels.map(k=>errors[k]||0);
+
+  const canvas=document.getElementById('timeline-chart');
+  if(tlChart){tlChart.destroy();tlChart=null}
+  if(!labels.length)return;
+  tlChart=new Chart(canvas,{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        {label:'All requests',data:tData,backgroundColor:'#85B7EB',borderColor:'#378ADD',borderWidth:0.5,borderRadius:2,order:2},
+        {label:'4xx/5xx errors',data:eData,backgroundColor:'#F09595',borderColor:'#E24B4A',borderWidth:0.5,borderRadius:2,order:1}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{title:t=>`Period: ${t[0].label}`}}},
+      scales:{
+        x:{ticks:{font:{size:11},color:'#888780',maxRotation:45,autoSkip:true,maxTicksLimit:20},grid:{display:false}},
+        y:{ticks:{font:{size:11},color:'#888780'},grid:{color:'rgba(136,135,128,0.15)'}}
+      }
+    }
+  });
+}
+
+function renderTable(){
+  const pgSize=parseInt(document.getElementById('pg-size').value);
+  const total=filtered.length;
+  const maxPage=Math.max(0,Math.ceil(total/pgSize)-1);
+  if(page>maxPage)page=maxPage;
+  const start=page*pgSize,end=Math.min(start+pgSize,total);
+  const slice=filtered.slice(start,end);
+  const scIdx=fields.indexOf('sc-status');
+  const displayFields=[...fields,'__file'];
+
+  const tbody=document.getElementById('tbody');
+  tbody.innerHTML='';
+  document.getElementById('empty-msg').style.display=slice.length?'none':'block';
+  slice.forEach(r=>{
+    const tr=document.createElement('tr');
+    displayFields.forEach((f,i)=>{
+      const td=document.createElement('td');
+      const v=r[f]||'';
+      if(f===fields[scIdx]&&v){
+        const cls=v.startsWith('2')?'pill-2':v.startsWith('3')?'pill-3':v.startsWith('4')?'pill-4':'pill-5';
+        td.innerHTML=`<span class="pill ${cls}">${v}</span>`;
+      } else if(f==='__file'){
+        td.style.color='var(--color-text-tertiary)';td.style.fontSize='11px';
+        td.title=v;td.textContent=v.length>30?'…'+v.slice(-28):v;
+      } else {
+        td.title=v;td.textContent=v.length>60?v.slice(0,58)+'…':v;
+      }
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+  document.getElementById('pg-info').textContent=total===0?'No results':`${(start+1).toLocaleString()}–${end.toLocaleString()} of ${total.toLocaleString()}`;
+  document.getElementById('btn-prev').disabled=page===0;
+  document.getElementById('btn-next').disabled=page>=maxPage;
+}
+
+function sortBy(col){
+  if(sortCol===col){sortDir*=-1}else{sortCol=col;sortDir=1}
+  document.querySelectorAll('.sort-arr').forEach((el,i)=>{
+    el.classList.toggle('on',i===col);
+    el.innerHTML=i===col?(sortDir===1?'&#9650;':'&#9660;'):'&#9650;';
+  });
+  const displayFields=[...fields,'__file'];
+  const f=displayFields[col];
+  filtered.sort((a,b)=>(a[f]||'').localeCompare(b[f]||'',undefined,{numeric:true})*sortDir);
+  page=0;renderTable();
+}
+
+function changePage(d){page+=d;renderTable()}
+
+function clearFilters(){
+  document.getElementById('search-box').value='';
+  document.getElementById('f-status').value='';
+  document.getElementById('f-method').value='';
+  document.getElementById('f-file').value='';
+  const dIdx=fields.indexOf('date');
+  if(dIdx>=0){
+    const dates=allRows.map(r=>r[fields[dIdx]]).filter(Boolean).sort();
+    if(dates.length){document.getElementById('f-date-from').value=dates[0];document.getElementById('f-date-to').value=dates[dates.length-1]}
+  }
+  page=0;applyFilters();
+}
+
+function exportCSV(){
+  if(!filtered.length)return;
+  const cols=[...fields,'__file'];
+  const rows=[cols.join(','),...filtered.map(r=>cols.map(f=>{const v=r[f]||'';return v.includes(',')||v.includes('"')?`"${v.replace(/"/g,'""')}"`:v}).join(','))];
+  const blob=new Blob([rows.join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='iis-filtered.csv';a.click();
+}
+</script>

@@ -1,0 +1,301 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans)}
+#drop-zone{border:1.5px dashed var(--color-border-secondary);border-radius:var(--border-radius-lg);padding:2.5rem;text-align:center;cursor:pointer;transition:background .15s;margin-bottom:1rem}
+#drop-zone:hover,#drop-zone.drag-over{background:var(--color-background-secondary)}
+#drop-zone input{display:none}
+.stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:1rem}
+.stat-card{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:.75rem 1rem}
+.stat-label{font-size:11px;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px}
+.stat-val{font-size:20px;font-weight:500;color:var(--color-text-primary)}
+.filters-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:.75rem;align-items:flex-end}
+.filter-group{display:flex;flex-direction:column;gap:4px}
+.filter-group label{font-size:11px;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.04em}
+.filter-group input,.filter-group select{height:32px;font-size:13px;padding:0 8px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);min-width:120px}
+#search-box{min-width:200px}
+.btn{height:32px;padding:0 14px;font-size:13px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);cursor:pointer}
+.btn:hover{background:var(--color-background-secondary)}
+.btn-sm{height:26px;padding:0 10px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:transparent;color:var(--color-text-secondary);cursor:pointer}
+.btn-sm:hover{background:var(--color-background-secondary)}
+.tbl-wrap{overflow-x:auto;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:var(--color-background-secondary);padding:7px 10px;text-align:left;font-weight:500;font-size:11px;color:var(--color-text-secondary);white-space:nowrap;position:sticky;top:0;cursor:pointer;user-select:none;border-bottom:0.5px solid var(--color-border-tertiary)}
+thead th:hover{color:var(--color-text-primary)}
+tbody tr{border-bottom:0.5px solid var(--color-border-tertiary)}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:var(--color-background-secondary)}
+tbody td{padding:5px 10px;white-space:nowrap;color:var(--color-text-primary)}
+.s2xx{color:#1D9E75}.s3xx{color:#BA7517}.s4xx{color:#D85A30}.s5xx{color:#A32D2D}
+.pill{display:inline-block;padding:1px 7px;border-radius:99px;font-size:11px;font-weight:500}
+.pill-2{background:#E1F5EE;color:#0F6E56}.pill-3{background:#FAEEDA;color:#854F0B}.pill-4{background:#FAECE7;color:#993C1D}.pill-5{background:#FCEBEB;color:#A32D2D}
+.pagination{display:flex;align-items:center;gap:8px;margin-top:.75rem;font-size:13px;color:var(--color-text-secondary)}
+.pagination button{width:28px;height:28px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:transparent;cursor:pointer;font-size:13px;color:var(--color-text-primary)}
+.pagination button:disabled{opacity:.35;cursor:default}
+.pagination button:hover:not(:disabled){background:var(--color-background-secondary)}
+#empty{text-align:center;padding:2rem;color:var(--color-text-tertiary);font-size:13px}
+.tag{display:inline-block;background:var(--color-background-secondary);border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:1px 8px;font-size:11px;color:var(--color-text-secondary);margin:2px}
+.sort-arrow{opacity:.4;margin-left:3px;font-size:10px}
+.sort-arrow.active{opacity:1}
+</style>
+
+<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">IIS log viewer — drop a log file to load and filter entries</h2>
+
+<div id="drop-zone" onclick="document.getElementById('file-input').click()">
+  <input type="file" id="file-input" accept=".log,.txt">
+  <div style="font-size:28px;margin-bottom:.5rem;color:var(--color-text-tertiary)">&#8659;</div>
+  <div style="font-weight:500;color:var(--color-text-primary);margin-bottom:.25rem">Drop IIS log file here</div>
+  <div style="font-size:13px;color:var(--color-text-tertiary)">or click to browse — supports W3C extended format (.log)</div>
+</div>
+
+<div id="main" style="display:none">
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-label">Total requests</div><div class="stat-val" id="st-total">0</div></div>
+    <div class="stat-card"><div class="stat-label">Filtered rows</div><div class="stat-val" id="st-filtered">0</div></div>
+    <div class="stat-card"><div class="stat-label">Unique IPs</div><div class="stat-val" id="st-ips">0</div></div>
+    <div class="stat-card"><div class="stat-label">Errors (4xx/5xx)</div><div class="stat-val" id="st-errors">0</div></div>
+  </div>
+
+  <div class="filters-row">
+    <div class="filter-group">
+      <label>Search all fields</label>
+      <input type="text" id="search-box" placeholder="IP, URL, user agent...">
+    </div>
+    <div class="filter-group">
+      <label>Status code</label>
+      <select id="f-status"><option value="">All</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Method</label>
+      <select id="f-method"><option value="">All</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Date from</label>
+      <input type="date" id="f-date-from">
+    </div>
+    <div class="filter-group">
+      <label>Date to</label>
+      <input type="date" id="f-date-to">
+    </div>
+    <div style="margin-top:auto">
+      <button class="btn" onclick="clearFilters()">Clear filters</button>
+    </div>
+    <div style="margin-top:auto;margin-left:auto">
+      <button class="btn" onclick="exportCSV()">Export CSV</button>
+    </div>
+  </div>
+
+  <div style="margin-bottom:.5rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap" id="active-filters"></div>
+
+  <div class="tbl-wrap">
+    <table id="log-table">
+      <thead id="thead-row"></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div id="empty" style="display:none">No rows match the current filters.</div>
+  </div>
+
+  <div class="pagination">
+    <button id="btn-prev" onclick="changePage(-1)">&#8249;</button>
+    <span id="pg-info"></span>
+    <button id="btn-next" onclick="changePage(1)">&#8250;</button>
+    <span style="margin-left:auto;font-size:12px">
+      <select id="pg-size" style="height:26px;font-size:12px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);padding:0 6px">
+        <option>50</option><option selected>100</option><option>250</option><option>500</option>
+      </select> rows/page
+    </span>
+  </div>
+</div>
+
+<script>
+let allRows=[], fields=[], filtered=[], sortCol=-1, sortDir=1, page=0;
+
+const dz=document.getElementById('drop-zone');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag-over')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag-over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag-over');loadFile(e.dataTransfer.files[0])});
+document.getElementById('file-input').addEventListener('change',e=>loadFile(e.target.files[0]));
+
+function loadFile(f){
+  if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>parseLog(e.target.result);
+  r.readAsText(f);
+}
+
+function parseLog(text){
+  const lines=text.split(/\r?\n/);
+  fields=[];allRows=[];
+  let fieldLine='';
+  for(const ln of lines){
+    if(ln.startsWith('#Fields:')){fieldLine=ln.slice(9).trim();fields=fieldLine.split(' ');continue}
+    if(ln.startsWith('#')||!ln.trim())continue;
+    const parts=ln.split(' ');
+    if(parts.length<fields.length)continue;
+    const row={};
+    fields.forEach((f,i)=>row[f]=parts[i]||'');
+    allRows.push(row);
+  }
+  if(!fields.length){alert('Could not parse fields from log. Make sure it is W3C extended format with a #Fields: header.');return}
+  buildUI();
+}
+
+function buildUI(){
+  document.getElementById('drop-zone').style.display='none';
+  document.getElementById('main').style.display='block';
+  buildHeaders();
+  populateFilters();
+  applyFilters();
+}
+
+function buildHeaders(){
+  const tr=document.createElement('tr');
+  fields.forEach((f,i)=>{
+    const th=document.createElement('th');
+    th.innerHTML=f+'<span class="sort-arrow" id="sa-'+i+'">&#9650;</span>';
+    th.onclick=()=>sortBy(i);
+    tr.appendChild(th);
+  });
+  document.getElementById('thead-row').innerHTML='';
+  document.getElementById('thead-row').appendChild(tr);
+}
+
+function populateFilters(){
+  const statusSet=new Set(),methodSet=new Set();
+  const scIdx=fields.indexOf('sc-status'),mIdx=fields.indexOf('cs-method');
+  allRows.forEach(r=>{
+    if(scIdx>=0&&r[fields[scIdx]])statusSet.add(r[fields[scIdx]]);
+    if(mIdx>=0&&r[fields[mIdx]])methodSet.add(r[fields[mIdx]]);
+  });
+  const ss=document.getElementById('f-status');
+  [...statusSet].sort().forEach(v=>{const o=document.createElement('option');o.value=v;o.text=v;ss.appendChild(o)});
+  const sm=document.getElementById('f-method');
+  [...methodSet].sort().forEach(v=>{const o=document.createElement('option');o.value=v;o.text=v;sm.appendChild(o)});
+
+  const dateIdx=fields.indexOf('date');
+  if(dateIdx>=0){
+    const dates=allRows.map(r=>r[fields[dateIdx]]).filter(Boolean).sort();
+    if(dates.length){document.getElementById('f-date-from').value=dates[0];document.getElementById('f-date-to').value=dates[dates.length-1]}
+  }
+
+  ['search-box','f-status','f-method','f-date-from','f-date-to'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{page=0;applyFilters()}));
+  document.getElementById('pg-size').addEventListener('change',()=>{page=0;renderTable()});
+}
+
+function applyFilters(){
+  const q=document.getElementById('search-box').value.toLowerCase().trim();
+  const st=document.getElementById('f-status').value;
+  const mt=document.getElementById('f-method').value;
+  const df=document.getElementById('f-date-from').value;
+  const dt=document.getElementById('f-date-to').value;
+  const scIdx=fields.indexOf('sc-status'),mIdx=fields.indexOf('cs-method'),dIdx=fields.indexOf('date');
+
+  filtered=allRows.filter(r=>{
+    if(q&&!Object.values(r).join(' ').toLowerCase().includes(q))return false;
+    if(st&&r[fields[scIdx]]!==st)return false;
+    if(mt&&r[fields[mIdx]]!==mt)return false;
+    const d=dIdx>=0?r[fields[dIdx]]:'';
+    if(df&&d&&d<df)return false;
+    if(dt&&d&&d>dt)return false;
+    return true;
+  });
+
+  updateStats();
+  renderTable();
+  updateFilterTags();
+}
+
+function updateStats(){
+  const scIdx=fields.indexOf('sc-status');
+  let errors=0;
+  const ips=new Set();
+  const ipIdx=fields.indexOf('c-ip');
+  filtered.forEach(r=>{
+    const s=scIdx>=0?r[fields[scIdx]]:'';
+    if(s&&(s.startsWith('4')||s.startsWith('5')))errors++;
+    if(ipIdx>=0&&r[fields[ipIdx]])ips.add(r[fields[ipIdx]]);
+  });
+  document.getElementById('st-total').textContent=allRows.length.toLocaleString();
+  document.getElementById('st-filtered').textContent=filtered.length.toLocaleString();
+  document.getElementById('st-ips').textContent=ips.size.toLocaleString();
+  document.getElementById('st-errors').textContent=errors.toLocaleString();
+}
+
+function renderTable(){
+  const pgSize=parseInt(document.getElementById('pg-size').value);
+  const total=filtered.length;
+  const maxPage=Math.max(0,Math.ceil(total/pgSize)-1);
+  if(page>maxPage)page=maxPage;
+  const start=page*pgSize,end=Math.min(start+pgSize,total);
+  const slice=filtered.slice(start,end);
+  const scIdx=fields.indexOf('sc-status');
+
+  const tbody=document.getElementById('tbody');
+  tbody.innerHTML='';
+  document.getElementById('empty').style.display=slice.length?'none':'block';
+
+  slice.forEach(r=>{
+    const tr=document.createElement('tr');
+    fields.forEach((f,i)=>{
+      const td=document.createElement('td');
+      let v=r[f]||'';
+      if(i===scIdx&&v){
+        const cls=v.startsWith('2')?'pill-2':v.startsWith('3')?'pill-3':v.startsWith('4')?'pill-4':'pill-5';
+        td.innerHTML=`<span class="pill ${cls}">${v}</span>`;
+      } else {
+        td.title=v;
+        td.textContent=v.length>60?v.slice(0,58)+'…':v;
+      }
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('pg-info').textContent=total===0?'No results':`${(start+1).toLocaleString()}–${end.toLocaleString()} of ${total.toLocaleString()}`;
+  document.getElementById('btn-prev').disabled=page===0;
+  document.getElementById('btn-next').disabled=page>=maxPage;
+}
+
+function sortBy(col){
+  if(sortCol===col){sortDir*=-1}else{sortCol=col;sortDir=1}
+  document.querySelectorAll('.sort-arrow').forEach((el,i)=>{el.classList.toggle('active',i===col);el.innerHTML=i===col?(sortDir===1?'&#9650;':'&#9660;'):'&#9650;'});
+  const f=fields[col];
+  filtered.sort((a,b)=>{
+    const av=a[f]||'',bv=b[f]||'';
+    return av.localeCompare(bv,undefined,{numeric:true})*sortDir;
+  });
+  page=0;renderTable();
+}
+
+function changePage(d){page+=d;renderTable()}
+
+function clearFilters(){
+  document.getElementById('search-box').value='';
+  document.getElementById('f-status').value='';
+  document.getElementById('f-method').value='';
+  const dateIdx=fields.indexOf('date');
+  if(dateIdx>=0){
+    const dates=allRows.map(r=>r[fields[dateIdx]]).filter(Boolean).sort();
+    if(dates.length){document.getElementById('f-date-from').value=dates[0];document.getElementById('f-date-to').value=dates[dates.length-1]}
+  }
+  page=0;applyFilters();
+}
+
+function updateFilterTags(){
+  const q=document.getElementById('search-box').value.trim();
+  const st=document.getElementById('f-status').value;
+  const mt=document.getElementById('f-method').value;
+  const af=document.getElementById('active-filters');
+  af.innerHTML='';
+  if(q)af.innerHTML+=`<span class="tag">search: ${q}</span>`;
+  if(st)af.innerHTML+=`<span class="tag">status: ${st}</span>`;
+  if(mt)af.innerHTML+=`<span class="tag">method: ${mt}</span>`;
+}
+
+function exportCSV(){
+  if(!filtered.length)return;
+  const rows=[fields.join(','),...filtered.map(r=>fields.map(f=>{const v=r[f]||'';return v.includes(',')||v.includes('"')?`"${v.replace(/"/g,'""')}"`:v}).join(','))];
+  const blob=new Blob([rows.join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='iis-filtered.csv';a.click();
+}
+</script>
